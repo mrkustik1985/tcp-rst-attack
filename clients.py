@@ -5,7 +5,23 @@ import time
 from socketserver import TCPServer, BaseRequestHandler
 from threading import Thread
 
-count_read_bytes = 1024
+base_address = "127.0.0.3"
+
+class Handler(BaseRequestHandler):
+    def handle(self):
+        self.request.settimeout(4)
+        while True:
+            try:
+                self.data = self.request.recv(count_read_bytes).strip()
+            except TimeoutError:
+                logging.info("Server timeout, RST attack successful")
+                break
+            self.request.sendto(
+                    transform_string(self.client_address[0], self.client_address[1]),
+                    self.client_address)
+            logging.info(f"Server finished iteration")
+
+count_read_bytes = 4096
 def transform_string(addr, port):
     return f"{addr}+{port}".encode("utf-8")
 
@@ -23,23 +39,6 @@ def a_start(sock: socket.socket, addr: (int, int)):
         time.sleep(1)
     sock.close()
 
-class Handler(BaseRequestHandler):
-    def handle(self):
-        self.request.settimeout(3)
-        while True:
-            try:
-                self.data = self.request.recv(count_read_bytes).strip()
-            except TimeoutError:
-                logging.info("Server timeout, RST attack successful")
-                break
-            logging.info("{} wrote:".format(self.client_address))
-            logging.info(f'{self.data}')
-            logging.info(f"{self.client_address}")
-            self.request.sendto(
-                    transform_string(self.client_address[0], self.client_address[1]),
-                    self.client_address)
-            logging.info(f"Server finished iteration")
-
 def b_start(server: TCPServer):
     server.serve_forever()
 
@@ -47,14 +46,14 @@ used_ports = set()
 
 def create_port():
     while True:
-        port = random.randrange(10000, 11000)
+        port = random.randrange(800, 8100)
         if port not in used_ports:
             break
     used_ports.add(port)
     return port
 
 def address_create():
-    return f'127.0.0.3', create_port()
+    return base_address, create_port()
 
 def clients_attack(a_address, b_address):
     logging.info(f"{a_address} aaa")
